@@ -1,3 +1,11 @@
+# PACKAGES:
+library(msm)
+library(RColorBrewer)
+library(snow)
+library(BaSTA)
+
+setwd("BaSTA")
+
 # USER INPUT:
 # Specify model to be used:
 # (GO = Gompertz, GM = Gompertz-Makeham, SI = Siler)
@@ -11,8 +19,6 @@ diffrec = c(1995, 1999, 2002)
 # (TRUE or FALSE)
 Covars = TRUE
 
-setwd("C:/Users/boa10gb/Documents/R/BaSTA")
-
 # Model variables to be adjusted
 # DEFINE PRIORS, STARTING PARAMETERS AND JUMP SDs:
 # Survival parameters:
@@ -24,18 +30,17 @@ thj = c(0.005, 0.005, 0.02, 0.0075, 0.001)
 # Starting values for survival parameters:
 thg = c(-1, 0.001, 0, -1, 0.001)
 
-# PACKAGES:
-library(msm)
-library(RColorBrewer)
-library(snow)
 
 # DATA PREP.:
 # Import data:
-bd = as.matrix(read.csv("bd.csv", sep=","),
-                            header=TRUE, row.names=NULL)
-Y = as.matrix(read.csv("Y.csv", sep=","),
-                          header=F, row.names=NULL)
-colnames(Y) = 1995:2002
+bd = as.matrix(read.csv("bd.csv", sep = ","),
+                            header = TRUE, row.names = NULL)
+
+dd = read.csv("raw.csv")                
+dd[,4] = as.Date(dd[,4], format = "%m/%d/%Y")
+dd = na.omit(dd[, 3:4])
+dd = dd[which(dd[,1] != ""),]
+Y = CensusToCaptHist(ID = dd[, 1], d = dd[, 2])
 
 
 n = nrow(Y)
