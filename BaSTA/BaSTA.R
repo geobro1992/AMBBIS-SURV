@@ -13,11 +13,11 @@ model = "SI"
 
 # Years with different recapture prob. (pi):
 # (Specify the start of the intervals)
-diffrec = c(1995, 1999, 2002)
+diffrec = c(2014)
 
 # Specify if covariates will be used:
 # (TRUE or FALSE)
-Covars = TRUE
+Covars = FALSE
 
 # Model variables to be adjusted
 # DEFINE PRIORS, STARTING PARAMETERS AND JUMP SDs:
@@ -33,9 +33,6 @@ thg = c(-1, 0.001, 0, -1, 0.001)
 
 # DATA PREP.:
 # Import data:
-bd = as.matrix(read.csv("bd.csv", sep = ","),
-                            header = TRUE, row.names = NULL)
-
 dd = read.csv("raw.csv")                
 dd[,4] = as.Date(dd[,4], format = "%m/%d/%Y")
 dd = na.omit(dd[, 3:4])
@@ -48,6 +45,7 @@ if(Covars){
 Z = read.csv("Z.csv", sep=",", header=TRUE)
 } else {
     Z = matrix(1, n, 1)
+    bd = matrix(0, n, 2)
 }
 nz = ncol(Z)
 
@@ -56,15 +54,15 @@ bi = bd[,1]
 di = bd[,2]
 
 # Define study duration:
-Ti = 1995
-Tf = 2002
+Ti = 2010
+Tf = 2017
 st = Ti:Tf
 nt = length(Ti:Tf)
 Dx = (st[2]-st[1])
 Tm = matrix(st, n, nt, byrow=TRUE)
 
 # Calculate first and last time observed:
-ytemp = t(t(Y) * st)
+ytemp = t(t(Y[,2:9]) * st)
 li = c(apply(ytemp,1,max))
 ytemp[ytemp==0] = 10000
 fi = c(apply(ytemp,1,min))
@@ -72,7 +70,7 @@ fi[fi==10000] = 0
 rm("ytemp")
 
 # Calculate number of times detected:
-oi = Y %*% rep(1, nt)
+oi = as.matrix(Y[,2:9]) %*% rep(1, nt)
 
 # MODELS
 nth = 5         # number of parameters in mortality function
@@ -131,98 +129,28 @@ ObsMatFun = function(f, l){
 
 
 
-inputMat <- as.data.frame(cbind(1:15, bi, di, Y, Z))
+inputMat <- as.data.frame(cbind(ID = 1:754, Birth = bi, Death = di, Y[,-1], Z))
 
 # analysis
-install.packages("BaSTA")
-library(BaSTA)
 
 # check data
-newData <- DataCheck(inputMat, studyStart = 1995,
-                      studyEnd = 2002, autofix = rep(1, 7),
+newData <- DataCheck(inputMat, studyStart = 2010,
+                      studyEnd = 2017, autofix = rep(1, 7),
                       silent = FALSE)
 
+ni = 1000000
+nt = 100
+nc = 4
+nb = 10000
 
-library(snow)
-out <- basta(object = inputMat, studyStart = 1995, studyEnd = 2002, nsim = 4, parallel = T)
+out <- basta(object = inputMat[,-12], studyStart = 2010, studyEnd = 2017,
+             model = "WE", shape = "bathtub", 
+             nsim = nc, niter = ni, burnin = nb, thinning = nt, ncpus = 4, parallel = T)
+
+
+
 summary(out, digits = 3)
 plot(out)
 plot(out, plot.trace = FALSE, fancy = T)
 
 
-#------------------
-# With Real Data!!!
-#------------------
-# USER INPUT:
-# Specify model to be used:
-# (GO = Gompertz, GM = Gompertz-Makeham, SI = Siler)
-model = "SI"
-
-# Specify if covariates will be used:
-# (TRUE or FALSE)
-Covars = TRUE
-
-setwd("C:/Users/boa10gb/Documents/R/BaSTA")
-
-# Model variables to be adjusted
-# DEFINE PRIORS, STARTING PARAMETERS AND JUMP SDs:
-# Survival parameters:
-thp = c(-5,0.1,-1,0.001,0.005)
-
-# Jump sd's for survival parameters:
-thj = c(0.005, 0.005, 0.02, 0.0075, 0.001)
-
-# Starting values for survival parameters:
-thg = c(-1, 0.001, 0, -1, 0.001)
-
-# PACKAGES:
-library(msm)
-library(RColorBrewer)
-library(snow)
-
-# DATA PREP.:
-# Import data:
-df = read.csv("ByCatch.csv")
-df$Date = as.Date(df$Date, format = "%m/%d/%Y")
-# get rid of incomplete records
-df = na.omit(df)
-
-
-# create year column
-tick = as.Date(c("2010-06-15",
-                 "2011-06-15",
-                 "2012-06-15", 
-                 "2013-06-15", 
-                 "2014-06-15", 
-                 "2015-06-15",
-                 "2016-06-15"))
-
-year = vector()
-for(i in 1:(length(tick)-1)){
-  x = length(subset(all.data$Date, all.data$Date > tick[i] & all.data$Date < tick[i+1]))
-  year = append(year, rep(i, x)) 
-}
-
-
-bd = vector()
-for(i in 1:length(dd)){
-  if(dd$Age[i] = Y){
-    bd[i] = dd$Year - 1
-  }
-}
-
-dd = rep(0, length(dd))
-
-
-Y = as.matrix(read.csv("Y.csv", sep=","),
-              header=F, row.names=NULL)
-colnames(Y) = 1995:2002
-
-
-n = nrow(Y)
-if(Covars){
-  Z = read.csv("Z.csv", sep=",", header=TRUE)
-} else {
-  Z = matrix(1, n, 1)
-}
-nz = ncol(Z)
