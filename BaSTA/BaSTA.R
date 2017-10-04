@@ -138,13 +138,13 @@ newData <- DataCheck(inputMat, studyStart = 2010,
                       studyEnd = 2017, autofix = rep(1, 7),
                       silent = FALSE)
 
-ni = 1000000
+ni = 100000
 nt = 100
 nc = 4
-nb = 10000
+nb = 1000
 
 out <- basta(object = inputMat[,-12], studyStart = 2010, studyEnd = 2017,
-             model = "WE", shape = "bathtub", 
+             model = "LO", shape = "simple", minAge = 1,
              nsim = nc, niter = ni, burnin = nb, thinning = nt, ncpus = 4, parallel = T)
 
 
