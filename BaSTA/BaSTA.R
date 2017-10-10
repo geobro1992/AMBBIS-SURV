@@ -45,13 +45,39 @@ if(Covars){
 Z = read.csv("Z.csv", sep=",", header=TRUE)
 } else {
     Z = matrix(1, n, 1)
-    bd = matrix(0, n, 2)
+    di = matrix(0, n, 2)
 }
 nz = ncol(Z)
 
 # Extract times of birth and death:
-bi = bd[,1]
-di = bd[,2]
+dd = read.csv("raw.csv")
+dd[,4] = as.Date(dd[,4], format = "%m/%d/%Y")
+dd = na.omit(dd[, c(3:4, 19)])
+dd = dd[which(dd[,1] != ""),]
+dd[,1] = as.numeric(dd[,1])
+bd = dd[which(dd[,3] == "J" | dd[,3] == "Y"),1:2]
+bd = cbind(bd[,1], as.numeric(format(bd[,2], "%Y")) - 1)
+
+temp = vector()
+count = 1
+
+for (i in 2:(length(bd[, 1]))) {
+  if (bd[i, 1] == bd[i - 1, 1]) {
+    temp[count] = i
+    count = count + 1  
+    }
+  else{
+    
+  }
+}
+
+bi = bd[-temp,]
+colnames(bi) = c("ID", "bi")
+colnames(dd) = c("ID", "Date", "Age")
+
+dd = merge(dd, bi, by = "ID", all = T)[,c(1,4)]
+bi = unique(dd)
+bi[is.na(bi)] <- 0
 
 # Define study duration:
 Ti = 2010
@@ -129,22 +155,25 @@ ObsMatFun = function(f, l){
 
 
 
-inputMat <- as.data.frame(cbind(ID = 1:754, Birth = bi, Death = di, Y[,-1], Z))
+inputMat <- as.data.frame(cbind(ID = 1:754, Birth = bi[,2], Death = di[,1], Y[,-1],  Z))
 
 # analysis
 
 # check data
 newData <- DataCheck(inputMat, studyStart = 2010,
-                      studyEnd = 2017, autofix = rep(1, 7),
+                      studyEnd = 2017, 
                       silent = FALSE)
 
-ni = 100000
+inputMat[325,2] = inputMat[325,2]-1 
+inputMat[325,6] = 0 
+
+ni = 60000
 nt = 100
 nc = 4
-nb = 1000
+nb = 10000
 
 out <- basta(object = inputMat[,-12], studyStart = 2010, studyEnd = 2017,
-             model = "LO", shape = "simple", minAge = 1,
+             model = "GO", shape = "simple",
              nsim = nc, niter = ni, burnin = nb, thinning = nt, ncpus = 4, parallel = T)
 
 
@@ -152,5 +181,69 @@ out <- basta(object = inputMat[,-12], studyStart = 2010, studyEnd = 2017,
 summary(out, digits = 3)
 plot(out)
 plot(out, plot.trace = FALSE, fancy = T)
+
+
+
+
+
+#--------------------
+# mortality functions
+#--------------------
+# Exponential
+par(mfrow = c(3,4))
+
+a = 1:10
+b = seq(0.001, 1, length.out = 10)    # 0.45 < b < 0.65 reasonable
+
+for (i in 1:length(b)) {
+  plot(a, rep(b[i], length(a)))
+  plot(a, exp(-rep(b[i], length(a)) * a))
+}
+
+#--------------------
+# Gompertz
+a = 1:10
+b0 = seq(-2, 2, length.out = 10)      # -1.1 reasonable
+b1 = seq(0.001, 1, length.out = 10)   # < 0.1 reasonable 
+
+par(mfrow = c(3,4))
+
+for (i in 1:length(b0)) {
+  plot(a, exp(b0[i] + b1[i] * a))
+  plot(a, exp((exp(b0[i])/b1[i]) * (1 - exp(b1[i] * a))))
+}
+
+#-------------------
+# Weibull
+a = 1:10
+b0 = seq(1, 10, length.out = 10)     # 1 < b < 4 reasonable
+b1 = seq(0.001, 1, length.out = 10)  # 0.2 reasonable
+
+par(mfrow = c(3,4))
+
+for (i in 1:length(b0)) {
+  plot(a, ((b0[i] * b1[i]) * (b1[i] * a) ^ (b0[i] - 1)))
+  plot(a, exp(-(b1[i] * a) ^ b0[i]))
+}
+
+#------------------
+# Logistic
+a = 1:10
+b0 = seq(0.1, 3, length.out = 10)
+b1 = seq(0.1, 3, length.out = 10)
+b2 = seq(0.1, 5, length.out = 10)
+
+par(mfrow = c(3,4))
+
+for (i in 1:length(b0)) {
+  plot(a, (exp(b0[i] + (b1[i] * a)) / ((1 + (b2[i] * (exp(b0[i]) / b1[i])) * (exp(b1[i] * a) - 1)))))
+  plot(a, ((1 + b2[i] * exp(b0[i]) / b1[i]) * (exp(b1[i] * a) - 1)) ^ -(1 / b2[i]))
+}
+
+
+
+
+
+
 
 
