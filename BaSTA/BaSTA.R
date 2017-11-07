@@ -9,7 +9,7 @@ setwd("BaSTA")
 # USER INPUT:
 # Specify model to be used:
 # (GO = Gompertz, GM = Gompertz-Makeham, SI = Siler)
-model = "SI"
+model = "EX"
 
 # Years with different recapture prob. (pi):
 # (Specify the start of the intervals)
@@ -17,7 +17,7 @@ diffrec = c(2014)
 
 # Specify if covariates will be used:
 # (TRUE or FALSE)
-Covars = FALSE
+Covars = TRUE
 
 # Model variables to be adjusted
 # DEFINE PRIORS, STARTING PARAMETERS AND JUMP SDs:
@@ -38,6 +38,7 @@ dd[, 4] = as.Date(dd[, 4], format = "%m/%d/%Y")
 dd = na.omit(dd[, 3:4])
 dd = dd[which(dd[, 1] != ""), ]
 Y = CensusToCaptHist(ID = dd[, 1], d = dd[, 2])
+Y = Y[-385,] # remove pond 53 individual to include group effect
 
 
 n = nrow(Y)
@@ -48,6 +49,8 @@ if (Covars) {
     di = matrix(0, n, 2)
 }
 nz = ncol(Z)
+di = di[-385,]
+Z = Z[-385,]
 
 # Extract times of birth and death:
 dd = read.csv("raw.csv")
@@ -65,8 +68,8 @@ for (i in 2:(length(bd[, 1]))) {
   if (bd[i, 1] == bd[i - 1, 1]) {
     temp[count] = i
     count = count + 1  
-    }
- else{
+  }
+  else{
   }
 }
 
@@ -77,8 +80,26 @@ colnames(dd) = c("ID", "Date", "Age")
 dd = merge(dd, bi, by = "ID", all = T)[, c(1, 4)]
 bi = unique(dd)
 bi[is.na(bi)] <- 0
+bi = bi[-385,] # remove pond 53 individual to include group effect
 
-inputMat <- as.data.frame(cbind(ID = 1:754, Birth = bi[,2], Death = di[,1], Y[,-1],  Z))
+# get pond ids for group effect
+dd = read.csv("raw.csv")                
+dd[, 4] = as.Date(dd[, 4], format = "%m/%d/%Y")
+dd = subset(dd, dd$X.10 == 4 | dd$X.10 == 5)
+dd = na.omit(dd[, c(3, 4, 12)])
+dd = dd[which(dd[, 1] != ""), ]
+
+# get pond ids for group effect
+pid = unique(dd[,c(1,3)])
+n_occur <- data.frame(table(pid$X.1))
+n_occur[n_occur$Freq > 1,] # find duplicates
+pid = pid[-c(3, 277, 425, 529, 621), ]
+pid[, 1] = as.numeric(pid[, 1])
+pid[, 2] = as.factor(as.numeric(pid[, 2]))
+Z = MakeCovMat(x = 2, data = pid)
+
+
+inputMat <- as.data.frame(cbind(ID = 1:753, Birth = bi[,2], Death = di[,1], Y[,-1],  Z = Z[,2:3]))
 
 # Define study duration:
 Ti = 2010
@@ -167,23 +188,42 @@ newData <- DataCheck(inputMat, studyStart = 2010,
 inputMat[325, 2] = inputMat[325, 2] - 1 
 inputMat[325, 6] = 0 
 
-ni = 60000
-nt = 100
+ni = 100000
+nt = 50
 nc = 4
-nb = 10000
+nb = 5000
 
-out <- basta(object = inputMat[,-12], studyStart = 2010, studyEnd = 2017,
-             model = "GO", shape = "simple",
+out <- basta(object = inputMat, studyStart = 2010, studyEnd = 2017, covarsStruct = "fused",
+             model = "EX", shape = "simple", lifeTable = T, minAge = 1,
              nsim = nc, niter = ni, burnin = nb, thinning = nt, ncpus = 4, parallel = T)
 
 
 
 summary(out, digits = 3)
 plot(out)
-plot(out, plot.trace = FALSE, fancy = T)
+plot(out, plot.trace = FALSE, fancy = F)
+
+inputMat = as.data.frame(inputMat)
+multiout <- multibasta(object = inputMat, studyStart = 2010, studyEnd = 2017, 
+                       models = c("EX", "GO", "WE", "LO"), shapes = c("simple", "Makeham", "bathtub"),
+                       nsim = nc, niter = ni, burnin = nb, thinning = nt, 
+                       ncpus = 4, parallel = T)
+
+summary(multiout, digits = 3)
+
+plot(multiout$runs$Lo.Si, fancy = T)
 
 
+# 2nd round to get DICs
+ni = 200000
+nt = 100
+nc = 4
+nb = 10000
 
+multiout <- multibasta(object = inputMat, studyStart = 2010, studyEnd = 2017, 
+                       models = c("GO", "WE", "LO"), shapes = c("Makeham", "bathtub"),
+                       nsim = nc, niter = ni, burnin = nb, thinning = nt, 
+                       ncpus = 4, parallel = T)
 
 
 #--------------------
@@ -229,8 +269,8 @@ for (i in 1:length(b0)) {
 #------------------
 # Logistic
 a = 1:10
-b0 = seq(0.1, 3, length.out = 10)
-b1 = seq(0.1, 3, length.out = 10)
+b0 = seq(-10, -.1, length.out = 10)
+b1 = seq(0.1, 5, length.out = 10)
 b2 = seq(0.1, 5, length.out = 10)
 
 par(mfrow = c(3, 4))
