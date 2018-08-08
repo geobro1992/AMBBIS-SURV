@@ -13,59 +13,58 @@ model = "EX"
 
 # Years with different recapture prob. (pi):
 # (Specify the start of the intervals)
-diffrec = c(2014)
+diffrec = c(2010:2017)
 
 # Specify if covariates will be used:
 # (TRUE or FALSE)
-Covars = TRUE
+Covars = F
 
 # Model variables to be adjusted
 # DEFINE PRIORS, STARTING PARAMETERS AND JUMP SDs:
 # Survival parameters:
 thp = c(-5,0.1,-1,0.001,0.005)
 
+# Starting values for survival parameters:
+thg = c(-1, 0.001, 0, -1, 0.001)
+
 # Jump sd's for survival parameters:
 thj = c(0.005, 0.005, 0.02, 0.0075, 0.001)
 
-# Starting values for survival parameters:
-thg = c(-1, 0.001, 0, -1, 0.001)
+
 
 
 # DATA PREP.:
 # Import data:
-dd = read.csv("raw.csv")                
-dd[, 4] = as.Date(dd[, 4], format = "%m/%d/%Y")
-dd = na.omit(dd[, 3:4])
-dd = dd[which(dd[, 1] != ""), ]
-Y = CensusToCaptHist(ID = dd[, 1], d = dd[, 2])
-Y = Y[-385,] # remove pond 53 individual to include group effect
+r.data = read.csv("raw.csv")                
+r.data[, 4] = as.Date(r.data[, 4], format = "%m/%d/%Y")
 
+# Assign codes to indv without Master IDs
+r.data = na.omit(r.data[, c(3:4, 12, 19)])
+r.data[, 1] = as.character(r.data[, 1])
 
-n = nrow(Y)
-if (Covars) {
-  Z = read.csv("Z.csv", sep=",", header = TRUE)
-} else {
-    Z = matrix(1, n, 1)
-    di = matrix(0, n, 2)
+count = 2000
+
+for (i in 1:length(r.data[,1])) {
+  if (r.data[i, 1] == "") {
+    r.data[i, 1] = count
+    count = count + 1
+  }
 }
-nz = ncol(Z)
-di = di[-385,]
-Z = Z[-385,]
 
-# Extract times of birth and death:
-dd = read.csv("raw.csv")
-dd[, 4] = as.Date(dd[, 4], format = "%m/%d/%Y")
-dd = na.omit(dd[, c(3:4, 19)])
-dd = dd[which(dd[, 1] != ""), ]
-dd[, 1] = as.numeric(dd[, 1])
-bd = dd[which(dd[, 3] == "J" | dd[, 3] == "Y"), 1:2]
-bd = cbind(bd[, 1], as.numeric(format(bd[, 2], "%Y")) - 1)
+colnames(r.data) = c("ID", "Date", "Pond","Age")
+r.data[,1] = as.factor(r.data[,1])
 
+# Known birth times
+kb = r.data[which(r.data[, 4] == "J" | r.data[, 4] == "Y" | r.data[, 4] == "M"), 1:2]
+ys = as.numeric(format(kb[, 2], "%Y")) - 1
+kb = cbind(kb, ys)
+
+# remove duplicates birth years
 temp = vector()
 count = 1
 
-for (i in 2:(length(bd[, 1]))) {
-  if (bd[i, 1] == bd[i - 1, 1]) {
+for (i in 2:(length(kb[, 1]))) {
+  if (kb[i, 1] == kb[i - 1, 1]) {
     temp[count] = i
     count = count + 1  
   }
@@ -73,34 +72,52 @@ for (i in 2:(length(bd[, 1]))) {
   }
 }
 
-bi = bd[-temp, ]
-colnames(bi) = c("ID", "bi")
-colnames(dd) = c("ID", "Date", "Age")
+kb = kb[-temp, ]
+colnames(kb) = c("ID", "Date","bi")
 
-dd = merge(dd, bi, by = "ID", all = T)[, c(1, 4)]
-bi = unique(dd)
+# merge data with birth dates
+df = merge(r.data, kb, by = "ID", all = T)[, c(1, 2, 3, 6)]
+
+# birth times for all individuals
+bi = unique(df[c(1,4)])
 bi[is.na(bi)] <- 0
-bi = bi[-385,] # remove pond 53 individual to include group effect
+
+# pond id for all individuals
+#pid = unique(df[c(1,3)])
+#pid = pid[-which(duplicated(pid[,1]) == T),]
+
+# cap history
+Y = CensusToCaptHist(ID = df[,1], d = df[,2])
+n = nrow(Y)
+
+#Y = Y[-385,] # remove pond 53 individual to include group effect
+#di = di[-385,]
+#Z = Z[-385,]
+#i = bi[-385,] # remove pond 53 individual to include group effect
+
+
+
+# If no covariates create Z column of 1s
+#Z = matrix(1, n, 1)
+
+# If unknown deaths create di column on 0s
+di = matrix(0, n, 2)
+
 
 # get pond ids for group effect
-dd = read.csv("raw.csv")                
-dd[, 4] = as.Date(dd[, 4], format = "%m/%d/%Y")
-dd = subset(dd, dd$X.10 == 4 | dd$X.10 == 5)
-dd = na.omit(dd[, c(3, 4, 12)])
-dd = dd[which(dd[, 1] != ""), ]
-
-# get pond ids for group effect
-pid = unique(dd[,c(1,3)])
-n_occur <- data.frame(table(pid$X.1))
+pid = unique(r.data[,c(1,3)])
+n_occur <- data.frame(table(pid[,1]))
 n_occur[n_occur$Freq > 1,] # find duplicates
-pid = pid[-c(3, 277, 425, 529, 621), ]
+pid = pid[-c(2, 1035, 1183, 1287, 1379), ]
 pid[, 1] = as.numeric(pid[, 1])
 pid[, 2] = as.factor(as.numeric(pid[, 2]))
-Z = MakeCovMat(x = 2, data = pid)
+pid = data.frame(pid[,2])
+colnames(pid) = "Pond"
+Z = MakeCovMat(~ Pond, data = pid)
 
 
-inputMat <- as.data.frame(cbind(ID = 1:753, Birth = bi[,2], Death = di[,1], Y[,-1],  Z = Z[,2:3]))
-
+inputMat <- as.data.frame(cbind(ID = 1:1513, Birth = bi[,2], Death = di[,1], Y[,-1],  Z = Z[,2:4]))
+inputMat = inputMat[-which(inputMat$Z.Pond4 > 0), ]
 # Define study duration:
 Ti = 2010
 Tf = 2017
@@ -177,6 +194,13 @@ ObsMatFun = function(f, l) {
 
 
 
+
+
+
+
+
+
+
 # analysis
 
 # check data
@@ -185,8 +209,9 @@ newData <- DataCheck(inputMat, studyStart = 2010,
                       silent = FALSE)
 
 # correcting errors with ID 325
-inputMat[325, 2] = inputMat[325, 2] - 1 
-inputMat[325, 6] = 0 
+inputMat[1043, 2] = inputMat[1043, 2] - 1 
+inputMat[1043, 6] = 0 
+
 
 ni = 100000
 nt = 50
@@ -206,26 +231,27 @@ plot(out, plot.trace = FALSE, fancy = F)
 inputMat = as.data.frame(inputMat)
 multiout <- multibasta(object = inputMat, studyStart = 2010, studyEnd = 2017, 
                        models = c("EX", "GO", "WE", "LO"), shapes = c("simple", "Makeham", "bathtub"),
+                       lifeTable = T, minAge = 0.5,
                        nsim = nc, niter = ni, burnin = nb, thinning = nt, 
                        ncpus = 4, parallel = T)
+
+save(multiout, file = "BaSTA_all.RData")
 
 summary(multiout, digits = 3)
 
-plot(multiout$runs$Lo.Si, fancy = T)
+plot(multiout$runs$Lo.Bt, fancy = T)
 
 
-# 2nd round to get DICs
-ni = 200000
-nt = 100
-nc = 4
-nb = 10000
+inputMat = inputMat[,1:11]
+out <- basta(object = inputMat, studyStart = 2010, studyEnd = 2017, diffrec = diffrec,
+             model = "LO", shape = "bathtub", lifeTable = T, minAge = 0.5,
+             nsim = nc, niter = ni, burnin = nb, thinning = nt, ncpus = 4, parallel = T)
 
-multiout <- multibasta(object = inputMat, studyStart = 2010, studyEnd = 2017, 
-                       models = c("GO", "WE", "LO"), shapes = c("Makeham", "bathtub"),
-                       nsim = nc, niter = ni, burnin = nb, thinning = nt, 
-                       ncpus = 4, parallel = T)
+save(out, file = "BaSTA_top.RData")
 
-
+load("BaSTA_top.RData")
+summary(out)
+plot(out, fancy = T)
 #--------------------
 # mortality functions
 #--------------------
