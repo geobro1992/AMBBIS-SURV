@@ -79,7 +79,7 @@ colnames(kb) = c("ID", "Date","bi")
 df = merge(r.data, kb, by = "ID", all = T)[, c(1, 2, 3, 6)]
 
 # birth times for all individuals
-bi = unique(df[c(1,4)])
+bi = df[!duplicated(df$ID), ]
 bi[is.na(bi)] <- 0
 
 # pond id for all individuals
@@ -105,18 +105,16 @@ di = matrix(0, n, 2)
 
 
 # get pond ids for group effect
-pid = unique(r.data[,c(1,3)])
+pid = df[!duplicated(df$ID), ]
 n_occur <- data.frame(table(pid[,1]))
 n_occur[n_occur$Freq > 1,] # find duplicates
-pid = pid[-c(2, 1035, 1183, 1287, 1379), ]
-pid[, 1] = as.numeric(pid[, 1])
-pid[, 2] = as.factor(as.numeric(pid[, 2]))
-pid = data.frame(pid[,2])
+pid[, 3] = as.factor(as.numeric(pid[, 3]))
+pid = data.frame(pid[,3])
 colnames(pid) = "Pond"
 Z = MakeCovMat(~ Pond, data = pid)
 
 
-inputMat <- as.data.frame(cbind(ID = 1:1513, Birth = bi[,2], Death = di[,1], Y[,-1],  Z = Z[,2:4]))
+inputMat <- as.data.frame(cbind(ID = 1:1513, Birth = bi[,4], Death = di[,1], Y[,-1],  Z = Z[,2:4]))
 inputMat = inputMat[-which(inputMat$Z.Pond4 > 0), ]
 # Define study duration:
 Ti = 2010
@@ -214,22 +212,13 @@ inputMat[1043, 6] = 0
 
 
 ni = 100000
-nt = 50
+nt = 90
 nc = 4
-nb = 5000
+nb = 10000
 
-out <- basta(object = inputMat, studyStart = 2010, studyEnd = 2017, covarsStruct = "fused",
-             model = "EX", shape = "simple", lifeTable = T, minAge = 1,
-             nsim = nc, niter = ni, burnin = nb, thinning = nt, ncpus = 4, parallel = T)
-
-
-
-summary(out, digits = 3)
-plot(out)
-plot(out, plot.trace = FALSE, fancy = F)
 
 inputMat = as.data.frame(inputMat)
-multiout <- multibasta(object = inputMat, studyStart = 2010, studyEnd = 2017, 
+multiout <- multibasta(object = inputMat, studyStart = 2010, studyEnd = 2017, recaptTrans = c(2010:2017),
                        models = c("EX", "GO", "WE", "LO"), shapes = c("simple", "Makeham", "bathtub"),
                        lifeTable = T, minAge = 0.5,
                        nsim = nc, niter = ni, burnin = nb, thinning = nt, 
@@ -239,7 +228,28 @@ save(multiout, file = "BaSTA_all.RData")
 
 summary(multiout, digits = 3)
 
-plot(multiout$runs$Lo.Bt, fancy = T)
+plot(multiout$runs$Lo.Ma, fancy = T)
+
+
+
+inputMat$Birth = 0
+out <- basta(object = inputMat, studyStart = 2010, studyEnd = 2017, covarsStruct = "fused",
+             model = "LO", shape = "bathtub", lifeTable = T, minAge = 0.5,
+             nsim = nc, niter = ni, burnin = nb, thinning = nt, ncpus = 4, parallel = T)
+
+
+
+summary(out, digits = 3)
+plot(out)
+plot(out, plot.trace = FALSE, fancy = T)
+
+
+
+
+
+
+
+
 
 
 inputMat = inputMat[,1:11]
