@@ -218,7 +218,11 @@ nb = 10000
 
 
 inputMat = as.data.frame(inputMat)
-multiout <- multibasta(object = inputMat, studyStart = 2010, studyEnd = 2017, recaptTrans = c(2010:2017),
+inputMat = inputMat[,-4]
+blks = c(1,3,5,7,9,11,14,18,19,21,22,24,26,27,28,29,31,33,41,43,44,48,56,57,58,
+61,62,63,65,66,69,71,72,74,78,80,82,83,84,88,89,92,94,95,97,104,106,108,109,115)
+inputMat = inputMat[-blks,]
+multiout <- multibasta(object = inputMat, studyStart = 2011, studyEnd = 2017,
                        models = c("EX", "GO", "WE", "LO"), shapes = c("simple", "Makeham", "bathtub"),
                        lifeTable = T, minAge = 0.5,
                        nsim = nc, niter = ni, burnin = nb, thinning = nt, 
@@ -228,12 +232,18 @@ save(multiout, file = "BaSTA_all.RData")
 
 summary(multiout, digits = 3)
 
-plot(multiout$runs$Lo.Ma, fancy = T)
+plot(multiout$runs$Lo.Bt, fancy = T)
 
 
 
-inputMat$Birth = 0
-out <- basta(object = inputMat, studyStart = 2010, studyEnd = 2017, covarsStruct = "fused",
+bls = c(4, 5,6,7,12,14,16, 17 , 18 ,41  ,46 , 50 ,51 , 53 , 59  ,69,  71 , 73  ,74 , 75,
+77,  78 , 79,  80 , 81  ,83 , 84  ,85 , 86 , 87 , 88 , 89,  90 , 91,  92 , 94 , 97 , 98,  99, 101,
+102, 103 ,106 ,107 ,109, 110 ,111 ,113 ,115, 120, 121, 124, 125, 128, 129, 132, 133, 134 ,135, 140,
+142, 143, 145, 146, 148, 149 ,161 ,172, 183, 194, 238, 249, 260, 271, 282, 315, 326, 348, 381, 392,
+403, 411, 419, 429, 450, 461, 483, 494, 526, 552, 563, 585, 607, 618, 651, 673, 684, 695, 706, 717,
+749, 771, 793, 804, 815, 826 ,837, 858, 869, 880, 902, 913, 924, 934, 945, 946, 947, 949)
+inputMat = inputMat[-bls,]
+out <- basta(object = inputMat, studyStart = 2012, studyEnd = 2017, covarsStruct = "fused",
              model = "LO", shape = "bathtub", lifeTable = T, minAge = 0.5,
              nsim = nc, niter = ni, burnin = nb, thinning = nt, ncpus = 4, parallel = T)
 
