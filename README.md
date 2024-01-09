@@ -1,4 +1,4 @@
-# _Ambystoma bishopi_ Survival Analysis
+## _Ambystoma bishopi_ Survival Analysis
 Supporting data and code for:
 Brooks G. C., T. A. Gorman, and C. A. Haas. 2024. Variation in Flatwoods Salamander Survival Is Unrelated to Temperature and Rainfall. Ichthyology and Herpetology.
 
